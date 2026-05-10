@@ -1,0 +1,5 @@
+venus_archive.sqlite
+__pycache__/
+.ipynb_checkpoints/
+*.pyc
+.env
