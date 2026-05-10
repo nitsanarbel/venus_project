@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <title>VENµS Satellite Search Engine 🛰️</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <style>
+        :root { --bgu-orange: #F29400; --header-blue: #2c3e50; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; }
+        .container { max-width: 1100px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .logo-header { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 2px solid var(--bgu-orange); }
+        .logo-header img { height: 60px; }
+        h1 { text-align: center; color: var(--header-blue); }
+        .filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; background: #ecf0f1; padding: 20px; border-radius: 8px; }
+        .filter-group { display: flex; flex-direction: column; }
+        label { font-weight: bold; font-size: 0.85em; color: var(--header-blue); margin-bottom: 5px; }
+        select, input { padding: 8px; border: 1px solid #bdc3c7; border-radius: 4px; }
+        .search-btn { grid-column: 1 / -1; background-color: var(--bgu-orange); color: white; padding: 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th { background-color: var(--header-blue); color: white; padding: 12px; text-align: left; }
+        td { padding: 12px; border-bottom: 1px solid #ddd; }
+        .download-link { background-color: #27ae60; color: white; padding: 5px 10px; text-decoration: none; border-radius: 4px; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="logo-header">
+        <img src="logos/BGU_logo_reverse.png">
+        <img src="logos/Venus logo.PNG">
+        <img src="logos\Science_from_Above.png">
+    </div>
+
+    <h1>VENµS Imagery Search Engine 🛰️</h1>
+
+    <div class="filter-grid">
+        <div class="filter-group">
+            <label>Mission Phase</label>
+            <select id="missionInput" onchange="updateMissionDetails()">
+                <option value="">All Missions</option>
+                <option value="VM01">VM01 </option>
+                <option value="VM03">VM03 </option>
+                <option value="VM05">VM05 </option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Site ID (Tile)</label>
+            <select id="siteInput"><option value="">All Sites</option></select>
+        </div>
+        <div class="filter-group"><label>Level</label><select id="levelInput"><option value="">All</option><option value="L1">L1</option><option value="L2">L2</option></select></div>
+        <div class="filter-group"><label>Start Date</label><input type="text" id="startDate"></div>
+        <div class="filter-group"><label>End Date</label><input type="text" id="endDate"></div>
+        <div class="filter-group"><label>Max Cloud (%)</label><input type="number" id="cloudInput" value="100"></div>
+        <button onclick="runSearch()" class="search-btn">SEARCH INVENTORY</button>
+    </div>
+    <div id="statusMessage" style="text-align:center; margin:10px; font-weight:bold;"></div>
+    <table id="resultsTable">
+        <thead><tr><th>Mission</th><th>Site</th><th>Date</th><th>Cloud</th><th>Download</th></tr></thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<script>
+    async function updateMissionDetails() {
+    const mission = document.getElementById('missionInput').value;
+    
+    // ניקוי התאריכים שנבחרו כדי למנוע בלבול
+    startPicker.clear();
+    endPicker.clear();
+
+    if (missionDates[mission]) {
+        startPicker.set('minDate', missionDates[mission].min);
+        startPicker.set('maxDate', missionDates[mission].max);
+        // ... שאר הקוד ששלחתי קודם
+    }
+}
+    const missionDates = {
+        "VM01": { min: "2017-12-01", max: "2020-10-30" },
+        "VM03": { min: "2021-09-06", max: "2021-10-28" },
+        "VM05": { min: "2022-03-16", max: "2024-07-31" }
+    };
+
+    let startPicker, endPicker;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const flatpickrConfig = { dateFormat: "Y-m-d", minDate: "2017-12-01", maxDate: "2024-07-31" };
+        startPicker = flatpickr("#startDate", flatpickrConfig);
+        endPicker = flatpickr("#endDate", flatpickrConfig);
+        updateMissionDetails(); // טעינה ראשונית של כל האריחים
+    });
+
+    async function updateMissionDetails() {
+        const mission = document.getElementById('missionInput').value;
+        
+        // הגבלת תאריכים
+        if (missionDates[mission]) {
+            startPicker.set('minDate', missionDates[mission].min);
+            startPicker.set('maxDate', missionDates[mission].max);
+            endPicker.set('minDate', missionDates[mission].min);
+            endPicker.set('maxDate', missionDates[mission].max);
+        } else {
+            startPicker.set('minDate', "2017-12-01");
+            startPicker.set('maxDate', "2024-07-31");
+        }
+
+        // טעינת אריחים דינמית
+        const resp = await fetch(`http://127.0.0.1:8000/get_sites?mission=${mission}`);
+        const data = await resp.json();
+        const siteSelect = document.getElementById('siteInput');
+        siteSelect.innerHTML = '<option value="">All Sites</option>';
+        data.sites.forEach(s => siteSelect.innerHTML += `<option value="${s}">${s}</option>`);
+    }
+
+    async function runSearch() {
+        const tbody = document.querySelector('#resultsTable tbody');
+        const status = document.getElementById('statusMessage');
+        status.innerText = "Searching...";
+        tbody.innerHTML = '';
+
+        const params = new URLSearchParams({
+            mission: document.getElementById('missionInput').value,
+            site: document.getElementById('siteInput').value,
+            level: document.getElementById('levelInput').value,
+            start_date: document.getElementById('startDate').value,
+            end_date: document.getElementById('endDate').value,
+            max_cloud: document.getElementById('cloudInput').value
+        });
+
+        try {
+            const resp = await fetch(`http://127.0.0.1:8000/search?${params}`);
+            const data = await resp.json();
+            status.innerText = `Found ${data.results.length} items.`;
+            data.results.forEach(item => {
+                const tr = document.createElement('tr');
+                const dUrl = `http://127.0.0.1:8000/download?file_path=${encodeURIComponent(item.assets.data.href)}`;
+                tr.innerHTML = `
+                    <td>${item.properties.mission}</td>
+                    <td>${item.properties.site}</td>
+                    <td>${new Date(item.properties.datetime).toLocaleDateString()}</td>
+                    <td>${item.properties.cloud_cover}%</td>
+                    <td><a href="${dUrl}" class="download-link">Download</a></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (e) { status.innerText = "Server Error."; }
+    }
+
+</script>
+</body>
+</html>
