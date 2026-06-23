@@ -2,6 +2,7 @@ import uvicorn
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.responses import HTMLResponse
 import sqlite3
 import os
 import datetime
@@ -81,3 +82,12 @@ async def download(file_path: str):
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+
+@app.get("/", response_class=HTMLResponse)
+def read_root():
+    # פתיחת קובץ ה-HTML וקריאת התוכן שלו
+    with open("index_.html", "r", encoding="utf-8") as file:
+        html_content = file.read()
+    return html_content
